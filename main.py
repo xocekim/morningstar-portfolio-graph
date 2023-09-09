@@ -1,6 +1,8 @@
+import sys
 import re
-import sqlite3
 import time
+import json
+from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,22 +12,30 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException,
 
 from mysecrets import USERNAME, PASSWORD
 
-# setup db
-con = sqlite3.connect('morningstar.db')
-con.row_factory = sqlite3.Row
-cur = con.cursor()
+
+# create or open json file
+try:
+    with open('morningstar.json', 'r') as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {}
 
 # setup selenium
-options = webdriver.EdgeOptions()
-# options.add_argument('--headless')
-options.add_argument('--no-sandbox')
-options.add_argument('--disable-gpu')
-options.add_argument('--disable-dev-shm-usage')
-options.add_argument("--window-size=1920,1200")
-# options.binary_location = """C:\Program Files\Google\Chrome Beta\Application\chrome.exe"""
-driver = webdriver.Edge(options=options)
-driver.set_window_position(-1000, 0)
-driver.maximize_window()
+options = webdriver.ChromeOptions()
+if hasattr(sys, 'getwindowsversion'):
+    options = webdriver.EdgeOptions()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Edge(options=options)
+    driver.set_window_position(-1000, 0)
+    driver.maximize_window()
+else:
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(options=options)
 driver.implicitly_wait(5)
 
 driver.get('https://www.morningstar.co.uk/uk/portfoliomanager/start')
@@ -49,14 +59,19 @@ for row in table.find_elements(By.CSS_SELECTOR, 'tr[class$=Item]'):
     share = {}
     tds = row.find_elements(By.CSS_SELECTOR, 'td')
     share_id = tds[0].find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
-    share['id'] = re.search(r'id=(\w+$)', share_id).group(1)
-    share['name'] = tds[0].text
+    share_id = re.search(r'id=(\w+$)', share_id).group(1)
     share['price'] = tds[1].text
     share['quantity'] = tds[4].text
+    share['timestamp'] = int(datetime.now().timestamp())
+
+    if share_id not in data:
+        data[share_id] = []
+    data[share_id].append(share)
     print(share)
-    cur.execute('INSERT INTO history (id, price, quantity) '
-                'VALUES (:id, :price, :quantity)', share)
-con.commit()
+
+# write data to json file
+with open('morningstar.json', 'w') as f:
+    json.dump(data, f)
 
 
 print('done')
