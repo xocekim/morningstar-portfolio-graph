@@ -60,14 +60,14 @@ for row in table.find_elements(By.CSS_SELECTOR, 'tr[class$=Item]'):
     tds = row.find_elements(By.CSS_SELECTOR, 'td')
     share_id = tds[0].find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
     share_id = re.search(r'id=(\w+$)', share_id).group(1)
-    share['price'] = tds[1].text
-    share['quantity'] = tds[4].text
-    share['timestamp'] = int(datetime.now().timestamp())
+    share_price = float(tds[1].text.replace(',', ''))
+    share_quantity = float(tds[4].text.replace(',', ''))
+    share_timestamp = int(datetime.now().timestamp())
 
     if share_id not in data:
-        data[share_id] = []
-    data[share_id].append(share)
-    print(share)
+        data[share_id] = {'quantity': 0, 'values': []}
+    data[share_id]['quantity'] = int(share_quantity)
+    data[share_id]['values'].append({'price': share_price, 'timestamp': share_timestamp})
 
 # write data to json file
 with open('morningstar.json', 'w') as f:
